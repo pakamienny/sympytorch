@@ -67,8 +67,7 @@ class _Node(torch.nn.Module):
     def __init__(self, *, expr, _memodict, _func_lookup, **kwargs):
         super().__init__(**kwargs)
 
-        self._sympy_func = expr.func
-
+         self._sympy_func = expr.func
         if issubclass(expr.func, sympy.Float):
             self._value = torch.nn.Parameter(torch.tensor(float(expr)))
             self._torch_func = lambda: self._value
@@ -85,6 +84,11 @@ class _Node(torch.nn.Module):
             self._value = int(expr)
             self._torch_func = lambda: self._value
             self._args = ()
+        elif issubclass(expr.func, sympy.Rational):
+            self.register_buffer('_numerator', torch.tensor(expr.p, dtype=torch.get_default_dtype()))
+            self.register_buffer('_denominator', torch.tensor(expr.q, dtype=torch.get_default_dtype()))
+            self._torch_func = lambda: self._numerator / self._denominator
+            self._args = ()
         elif issubclass(expr.func, sympy.Symbol):
             self._name = expr.name
             self._torch_func = lambda value: value
@@ -100,14 +104,23 @@ class _Node(torch.nn.Module):
                     _memodict[arg] = arg_
                 args.append(arg_)
             self._args = torch.nn.ModuleList(args)
-
+            
     def sympy(self, _memodict):
         if issubclass(self._sympy_func, sympy.Float):
             return self._sympy_func(self._value.item())
         elif issubclass(self._sympy_func, sympy.UnevaluatedExpr):
             return self._sympy_func(self._value.item())
         elif issubclass(self._sympy_func, sympy.Integer):
+            if self._sympy_func == sympy.core.numbers.One:
+                return sympy.S.One
+            if self._sympy_func == sympy.core.numbers.NegativeOne:
+                return sympy.S.NegativeOne
             return self._sympy_func(self._value)
+        elif issubclass(self._sympy_func, sympy.Rational):
+            if issubclass(self._sympy_func, type(sympy.S.Half)):
+                return sympy.S.Half
+            else:
+                return self._sympy_func(self._numerator.item(), self._denominator.item())
         elif issubclass(self._sympy_func, sympy.Symbol):
             return self._sympy_func(self._name)
         else:
