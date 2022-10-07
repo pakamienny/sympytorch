@@ -67,7 +67,7 @@ class _Node(torch.nn.Module):
     def __init__(self, *, expr, _memodict, _func_lookup, **kwargs):
         super().__init__(**kwargs)
 
-         self._sympy_func = expr.func
+        self._sympy_func = expr.func
         if issubclass(expr.func, sympy.Float):
             self._value = torch.nn.Parameter(torch.tensor(float(expr)))
             self._torch_func = lambda: self._value
